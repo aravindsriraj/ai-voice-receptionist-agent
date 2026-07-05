@@ -24,4 +24,6 @@ testpaths = ["tests"]
 filterwarnings = [
     # Expected: we pin Python 3.12 specifically to use stdlib audioop for G.711 transcoding.
     "ignore:'audioop' is deprecated:DeprecationWarning",
+    # Third-party (google-adk 2.3.0) internal deprecation, not actionable by this project.
+    "ignore:BaseAgentConfig is deprecated:DeprecationWarning",
 ]
