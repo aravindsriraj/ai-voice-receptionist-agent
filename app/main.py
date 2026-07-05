@@ -11,6 +11,18 @@ from app.twiml import build_connect_stream_twiml  # noqa: E402
 from app.bridge import run_call, APP_NAME       # noqa: E402
 
 settings = load_settings(os.environ)
+
+# Ensure our app.* INFO logs (tool calls, transcripts, confirmation results) reach
+# stdout even when running under uvicorn, which only configures its own loggers.
+import logging  # noqa: E402
+_applog = logging.getLogger("app")
+if not _applog.handlers:
+    _h = logging.StreamHandler()
+    _h.setFormatter(logging.Formatter("%(levelname)s:%(name)s: %(message)s"))
+    _applog.addHandler(_h)
+    _applog.setLevel(logging.INFO)
+    _applog.propagate = False
+
 app = FastAPI()
 
 # Runtime (ADK runner + session service) is built lazily on first use so the module
