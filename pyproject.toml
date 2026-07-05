@@ -36,4 +36,6 @@ filterwarnings = [
     "ignore:'audioop' is deprecated:DeprecationWarning",
     # Third-party (google-adk 2.3.0) internal deprecation, not actionable by this project.
     "ignore:BaseAgentConfig is deprecated:DeprecationWarning",
+    # Starlette TestClient's httpx deprecation — test tooling only (category-agnostic).
+    "ignore:Using `httpx` with `starlette.testclient`",
 ]
