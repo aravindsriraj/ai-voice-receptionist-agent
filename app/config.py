@@ -17,6 +17,7 @@ class Settings:
     twilio_whatsapp_from: str
     resend_api_key: str
     email_from: str
+    email_enabled: bool
     public_base_url: str
 
 
@@ -34,5 +35,7 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         twilio_whatsapp_from=env["TWILIO_WHATSAPP_FROM"],
         resend_api_key=env["RESEND_API_KEY"],
         email_from=env["EMAIL_FROM"],
+        email_enabled=env.get("EMAIL_ENABLED", "true").strip().lower()
+        not in ("false", "0", "no", "off"),
         public_base_url=env["PUBLIC_BASE_URL"],
     )

@@ -57,7 +57,8 @@ def _build_runtime():
     calendar = CalendarClient(gcal, settings.clinic_calendar_id, settings.clinic_timezone,
                               settings.open_hour, settings.close_hour, settings.slot_minutes)
     booking = BookingService(calendar, _build_store(), _build_notifier(),
-                             settings.clinic_timezone, settings.slot_minutes)
+                             settings.clinic_timezone, settings.slot_minutes,
+                             email_enabled=settings.email_enabled)
     agent = build_agent(settings, booking, calendar)
     session_service = InMemorySessionService()
     runner = Runner(app_name=APP_NAME, agent=agent, session_service=session_service)
@@ -106,4 +107,5 @@ async def reminders_task():
     from app.reminders import dispatch_due_reminders
     now = datetime.now(ZoneInfo(settings.clinic_timezone))
     return dispatch_due_reminders(_build_store(), _build_notifier(),
-                                  settings.clinic_timezone, now)
+                                  settings.clinic_timezone, now,
+                                  email_enabled=settings.email_enabled)

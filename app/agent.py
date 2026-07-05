@@ -17,11 +17,16 @@ Your goals, in order:
    already known from caller ID — confirm it by reading it back, do not ask them to
    recite it.
 5. When they choose a time, call `book_appointment`. Then tell them it is booked and
-   that a WhatsApp and email confirmation are on the way.
+   a confirmation is on the way.
 
 Style: concise, friendly, one question at a time. Spell dates and times out loud
 clearly. If a tool reports an error, apologize briefly and offer an alternative.
 Do not give medical advice."""
+
+_EMAIL_ON = ("Also ask the caller for an email address and pass it to `book_appointment` "
+             "so they get an email confirmation too.")
+_EMAIL_OFF = ("Do NOT ask the caller for an email address — confirmations are sent by "
+              "WhatsApp only. Call `book_appointment` without an email.")
 
 
 def _now_tz(tz_name: str) -> datetime:
@@ -41,9 +46,10 @@ def build_agent(settings, booking_service, calendar_client) -> Agent:
                 "iso_slots": [s.isoformat() for s in slots]}
 
     def book_appointment(name: str, reason: str, start_iso: str,
-                         email: str, tool_context) -> dict:
+                         tool_context, email: str = "") -> dict:
         """Book an appointment. start_iso must be one of the iso_slots returned by
-        check_availability. Phone is taken from caller ID (session state)."""
+        check_availability. Phone is taken from caller ID (session state). email is
+        optional."""
         phone = tool_context.state.get("caller_phone", "")
         start = datetime.fromisoformat(start_iso)
         now = _now_tz(tz_name)
@@ -59,9 +65,11 @@ def build_agent(settings, booking_service, calendar_client) -> Agent:
             language_code="en-US",
         ),
     )
+    email_policy = _EMAIL_ON if getattr(settings, "email_enabled", True) else _EMAIL_OFF
+    instruction = INSTRUCTION.format(language="English") + "\n\n" + email_policy
     return Agent(
         name="clinic_receptionist",
         model=llm,
-        instruction=INSTRUCTION.format(language="English"),
+        instruction=instruction,
         tools=[check_availability, book_appointment],
     )

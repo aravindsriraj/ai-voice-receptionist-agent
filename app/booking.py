@@ -13,12 +13,14 @@ def format_when(start: datetime, tz_name: str) -> str:
 
 
 class BookingService:
-    def __init__(self, calendar, store, notifier, tz_name: str, slot_minutes: int):
+    def __init__(self, calendar, store, notifier, tz_name: str, slot_minutes: int,
+                 email_enabled: bool = True):
         self.calendar = calendar
         self.store = store
         self.notifier = notifier
         self._tz_name = tz_name
         self._slot_minutes = slot_minutes
+        self._email_enabled = email_enabled
 
     def book(self, name, reason, phone, email, start: datetime, now: datetime) -> dict:
         if start <= now:
@@ -44,12 +46,14 @@ class BookingService:
         except Exception:
             # don't fail the booking if a channel errors, but make it visible
             logger.exception("whatsapp confirmation FAILED for %s", phone)
-        if email:
+        if self._email_enabled and email:
             try:
                 self.notifier.send_email(email, subject, html)
                 logger.info("email confirmation sent to %s", email)
             except Exception:
                 logger.exception("email confirmation FAILED for %s", email)
+        elif not self._email_enabled:
+            logger.info("email disabled; skipping email confirmation")
         else:
             logger.info("no email captured; skipping email confirmation")
         return {"ok": True, "appointment_id": appt_id,
