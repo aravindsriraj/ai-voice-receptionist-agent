@@ -1,11 +1,44 @@
-<!doctype html><meta charset="utf-8"><title>Register</title>
-<h1>Create account</h1>
-<form method="post" action="/register">
-  <input name="name" placeholder="Full name" required><br>
-  <input name="email" type="email" placeholder="Email" required><br>
-  <input name="password" type="password" placeholder="Password (min 6)" required><br>
-  <input name="country_code" placeholder="Country code e.g. 91" required style="width:6em">
-  <input name="mobile" placeholder="Mobile number" required><br>
-  <button>Register</button>
-</form>
-<p><a href="/login">Already have an account? Log in</a></p>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Create account · Reception</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="auth">
+  <div class="auth-top"><a class="brand" href="/">Reception</a></div>
+  <main class="auth-main">
+    <form class="card" id="form" method="post" action="/register">
+      <h1>Create your account</h1>
+      <p class="sub">Book appointments by voice — we'll send your confirmation by WhatsApp and email.</p>
+      <div class="error" id="error"></div>
+      <div class="field">
+        <label for="name">Full name</label>
+        <input class="input" id="name" name="name" placeholder="Jane Doe" required>
+      </div>
+      <div class="field">
+        <label for="email">Email</label>
+        <input class="input" id="email" name="email" type="email" placeholder="you@example.com" required>
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input class="input" id="password" name="password" type="password" placeholder="At least 6 characters" required>
+      </div>
+      <div class="field">
+        <label for="mobile">Mobile number</label>
+        <div class="row">
+          <input class="input" id="country_code" name="country_code" placeholder="+91" required>
+          <input class="input" id="mobile" name="mobile" placeholder="98765 43210" required>
+        </div>
+      </div>
+      <button class="btn" type="submit">Create account</button>
+      <p class="alt">Already have an account? <a href="/login">Log in</a></p>
+    </form>
+  </main>
+  <script type="module" src="/static/js/auth.js"></script>
+</body>
+</html>

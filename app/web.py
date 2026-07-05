@@ -59,6 +59,13 @@ def make_router(get_store, get_twilio, settings, static_dir) -> APIRouter:
         request.session.clear()
         return RedirectResponse("/login", status_code=303)
 
+    @router.get("/api/me")
+    async def me(request: Request):
+        user = current_user(request)
+        if not user:
+            raise HTTPException(status_code=401, detail="not logged in")
+        return {"name": user["name"], "email": user["email"], "mobile": user["mobile"]}
+
     @router.post("/api/call-me")
     async def call_me(request: Request):
         user = current_user(request)

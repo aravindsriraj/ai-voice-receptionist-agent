@@ -1,15 +1,27 @@
-const log = (r, t) => {
-  const p = document.getElementById("transcript");
-  p.textContent += `\n[${r}] ${t}`;
-  p.scrollTop = p.scrollHeight;
-};
+const logEl = document.getElementById("log");
+const orb = document.getElementById("orb");
+const talkBtn = document.getElementById("talk");
+
+function bubble(role, text) {
+  const d = document.createElement("div");
+  d.className = "bubble " + role;
+  d.textContent = text;
+  logEl.appendChild(d);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+// greet by first name
+fetch("/api/me").then(r => (r.ok ? r.json() : null)).then(u => {
+  if (u && u.name) document.getElementById("greeting").textContent = "Hi, " + u.name.split(" ")[0];
+}).catch(() => {});
 
 document.getElementById("callme").onclick = async () => {
   const r = await fetch("/api/call-me", { method: "POST" });
-  log("system", r.ok ? "Calling your mobile…" : "Call failed (are you logged in?)");
+  bubble("system", r.ok ? "Calling your phone now — pick up to talk." : "Couldn't place the call.");
 };
 
-document.getElementById("talk").onclick = async () => {
+talkBtn.onclick = async () => {
+  talkBtn.disabled = true;
   const proto = location.protocol === "https:" ? "wss" : "ws";
   const ws = new WebSocket(`${proto}://${location.host}/ws/talk`);
   ws.binaryType = "arraybuffer";
@@ -21,13 +33,17 @@ document.getElementById("talk").onclick = async () => {
   const player = new AudioWorkletNode(playCtx, "pcm-player-processor");
   player.connect(playCtx.destination);
 
+  ws.onopen = () => { orb.classList.add("live"); bubble("system", "Connected — start speaking."); };
+  ws.onclose = () => { orb.classList.remove("live"); talkBtn.disabled = false; };
+  ws.onerror = () => bubble("system", "Connection error.");
+
   ws.onmessage = (e) => {
     if (typeof e.data === "string") {
       const m = JSON.parse(e.data);
       if (m.type === "interrupt") player.port.postMessage({ command: "endOfAudio" });
-      else if (m.type === "transcript") log(m.role, m.text);
+      else if (m.type === "transcript") bubble(m.role, m.text);
     } else {
-      player.port.postMessage(e.data);   // 24kHz PCM ArrayBuffer
+      player.port.postMessage(e.data);   // 24kHz PCM
     }
   };
 
@@ -41,5 +57,4 @@ document.getElementById("talk").onclick = async () => {
     for (let i = 0; i < f.length; i++) pcm[i] = Math.max(-1, Math.min(1, f[i])) * 0x7fff;
     ws.send(pcm.buffer);
   };
-  log("system", "Connected — start speaking.");
 };

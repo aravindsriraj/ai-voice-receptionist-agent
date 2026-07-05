@@ -67,3 +67,13 @@ def test_login_bad_password_blocks(tmp_path):
 def test_call_me_requires_login(tmp_path):
     c, store, _ = _client(tmp_path)
     assert c.post("/api/call-me").status_code == 401
+
+
+def test_api_me_returns_account_after_login(tmp_path):
+    c, store, _ = _client(tmp_path)
+    assert c.get("/api/me").status_code == 401
+    c.post("/register", data={"name": "Jane Doe", "email": "j@x.com", "password": "secret123",
+                              "country_code": "91", "mobile": "9941467556"})
+    me = c.get("/api/me")
+    assert me.status_code == 200
+    assert me.json() == {"name": "Jane Doe", "email": "j@x.com", "mobile": "+919941467556"}

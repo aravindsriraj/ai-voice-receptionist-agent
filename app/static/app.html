@@ -1,7 +1,35 @@
-<!doctype html><meta charset="utf-8"><title>Clinic receptionist</title>
-<h1>Talk to the clinic receptionist</h1>
-<button id="talk">🎤 Talk in browser</button>
-<button id="callme">📞 Call me</button>
-<form method="post" action="/logout" style="display:inline"><button>Log out</button></form>
-<pre id="transcript" style="border:1px solid #ccc;padding:1em;height:240px;overflow:auto"></pre>
-<script type="module" src="/static/js/app.js"></script>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reception</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <header class="app-top">
+    <a class="brand" href="/app">Reception</a>
+    <form method="post" action="/logout"><button class="logout" type="submit">Log out</button></form>
+  </header>
+  <main class="console">
+    <h1 class="greeting" id="greeting">Hi there</h1>
+    <p class="sub">Talk to the receptionist, or have us call your phone.</p>
+
+    <div class="orb-wrap"><div class="orb" id="orb"></div></div>
+
+    <div class="actions">
+      <button class="btn" id="talk">Talk to receptionist</button>
+      <button class="btn secondary" id="callme">Call my phone</button>
+    </div>
+
+    <section class="convo">
+      <div class="convo-head">Conversation</div>
+      <div class="log" id="log"></div>
+    </section>
+  </main>
+  <script type="module" src="/static/js/app.js"></script>
+</body>
+</html>
