@@ -40,6 +40,21 @@ def is_interrupt(event) -> bool:
     return bool(getattr(event, "interrupted", False))
 
 
+def _log_event(event) -> None:
+    """Best-effort visibility into the live conversation (tool calls + final transcripts).
+    Guarded with getattr so it is safe for both real ADK events and test doubles."""
+    gfc = getattr(event, "get_function_calls", None)
+    if callable(gfc):
+        for fc in (gfc() or []):
+            logger.info("tool call: %s(%s)", fc.name, dict(fc.args or {}))
+    it = getattr(event, "input_transcription", None)
+    if it and getattr(it, "text", None) and getattr(it, "finished", False):
+        logger.info("caller said: %s", it.text)
+    ot = getattr(event, "output_transcription", None)
+    if ot and getattr(ot, "text", None) and getattr(ot, "finished", False):
+        logger.info("agent said: %s", ot.text)
+
+
 # ---- orchestration (integration; driven by manual test call) -------------------
 async def run_call(websocket, runner, session_service) -> None:
     """Bridge one Twilio Media Stream call to one ADK run_live() session.
@@ -62,6 +77,9 @@ async def run_call(websocket, runner, session_service) -> None:
         async for event in runner.run_live(
                 user_id=caller_number or "anon", session_id=stream_sid,
                 live_request_queue=live_queue, run_config=run_config):
+            _log_event(event)
+            if getattr(event, "error_code", None):
+                logger.error("live error: %s - %s", event.error_code, event.error_message)
             if is_interrupt(event) and stream_sid:
                 await websocket.send_text(twilio_clear_frame(stream_sid))
                 continue

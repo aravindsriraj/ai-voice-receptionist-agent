@@ -1,7 +1,10 @@
 from __future__ import annotations
+import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from app.messaging import confirmation_texts
+
+logger = logging.getLogger(__name__)
 
 
 def format_when(start: datetime, tz_name: str) -> str:
@@ -31,16 +34,23 @@ class BookingService:
             "start": start, "timezone": self._tz_name, "calendar_event_id": event_id,
             "status": "booked", "reminder_24h_sent": False, "reminder_1h_sent": False,
         })
+        logger.info("booked appointment %s: %s (%s) at %s, event=%s",
+                    appt_id, name, phone, start.isoformat(), event_id)
         when = format_when(start, self._tz_name)
         wa_body, subject, html = confirmation_texts(name, when)
         try:
             self.notifier.send_whatsapp(phone, wa_body)
+            logger.info("whatsapp confirmation sent to %s", phone)
         except Exception:
-            pass  # prototype: don't fail the booking if a channel errors
+            # don't fail the booking if a channel errors, but make it visible
+            logger.exception("whatsapp confirmation FAILED for %s", phone)
         if email:
             try:
                 self.notifier.send_email(email, subject, html)
+                logger.info("email confirmation sent to %s", email)
             except Exception:
-                pass
+                logger.exception("email confirmation FAILED for %s", email)
+        else:
+            logger.info("no email captured; skipping email confirmation")
         return {"ok": True, "appointment_id": appt_id,
                 "message": f"Booked for {when}. A confirmation is on its way."}
