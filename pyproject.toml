@@ -1,0 +1,23 @@
+[project]
+name = "voice-agent"
+version = "0.1.0"
+requires-python = "==3.12.*"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "python-dotenv>=1.0",
+    "google-adk>=1.0",
+    "google-genai>=1.0",
+    "google-api-python-client>=2.140",
+    "google-auth>=2.30",
+    "google-cloud-firestore>=2.16",
+    "twilio>=9.0",
+    "resend>=2.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
