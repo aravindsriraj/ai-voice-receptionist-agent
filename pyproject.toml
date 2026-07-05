@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "voice-agent"
+version = "0.1.0"
+requires-python = "==3.12.*"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "python-multipart>=0.0.9",
+    "python-dotenv>=1.0",
+    "google-adk>=1.0",
+    "google-genai>=1.0",
+    "google-api-python-client>=2.140",
+    "google-auth>=2.30",
+    "google-cloud-firestore>=2.16",
+    "twilio>=9.0",
+    "resend>=2.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
+
+[tool.setuptools]
+packages = ["app"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+filterwarnings = [
+    # Expected: we pin Python 3.12 specifically to use stdlib audioop for G.711 transcoding.
+    "ignore:'audioop' is deprecated:DeprecationWarning",
+    # Third-party (google-adk 2.3.0) internal deprecation, not actionable by this project.
+    "ignore:BaseAgentConfig is deprecated:DeprecationWarning",
+]
