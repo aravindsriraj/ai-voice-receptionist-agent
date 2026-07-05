@@ -7,3 +7,5 @@ service-account.json
 .pytest_cache/
 .venv/
 venv/
+build/
+dist/
