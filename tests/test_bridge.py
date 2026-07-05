@@ -66,6 +66,11 @@ class FakeSessionService:
                              "session_id": session_id, "state": state})
 
 
+class FakeStore:
+    def __init__(self, user=None): self._user = user
+    def find_by_phone(self, phone): return self._user
+
+
 def _audio_event(pcm24k_bytes):
     part = SimpleNamespace(inline_data=SimpleNamespace(
         mime_type="audio/pcm;rate=24000", data=pcm24k_bytes))
@@ -102,11 +107,14 @@ async def test_run_call_creates_session_and_bridges_audio_and_barge_in():
     ws = FakeWebSocket([start, media, stop])
     session_service = FakeSessionService()
     runner = FakeRunner([_interrupt_event(), _audio_event(pcm24k)])
+    user = {"name": "Aravindan", "mobile": "+15551234567", "email": "a@b.com"}
 
-    await run_call(ws, runner, session_service)
+    await run_call(ws, runner, session_service, store=FakeStore(user))
 
-    # session created with caller phone from custom parameters
-    assert session_service.created[0]["state"] == {"caller_phone": "+15551234567"}
+    # session created with the account identity, enriched by phone lookup
+    assert session_service.created[0]["state"] == {
+        "caller_name": "Aravindan", "caller_phone": "+15551234567",
+        "caller_email": "a@b.com"}
     assert session_service.created[0]["session_id"] == "MZ123"
     assert runner.run_live_kwargs["session_id"] == "MZ123"
 

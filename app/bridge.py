@@ -4,6 +4,7 @@ from google.adk.agents.run_config import RunConfig, StreamingMode
 from google.adk.agents.live_request_queue import LiveRequestQueue
 from google.genai import types
 from app.audio import Resampler, ulaw8k_to_pcm16k, pcm24k_to_ulaw8k
+from app.identity import identity_state, greeting_kickoff
 
 logger = logging.getLogger(__name__)
 
@@ -56,12 +57,13 @@ def _log_event(event) -> None:
 
 
 # ---- orchestration (integration; driven by manual test call) -------------------
-async def run_call(websocket, runner, session_service) -> None:
+async def run_call(websocket, runner, session_service, store=None) -> None:
     """Bridge one Twilio Media Stream call to one ADK run_live() session.
 
     session_service is passed explicitly because Runner exposes no public
     session_service attribute in google-adk 2.3.0. The runner MUST be built with
-    app_name=APP_NAME so run_live() can find the session created here.
+    app_name=APP_NAME so run_live() can find the session created here. When a `store`
+    is given, the caller is looked up by phone to enrich session state with name/email.
     """
     await websocket.accept()
     stream_sid: str | None = None
@@ -98,19 +100,19 @@ async def run_call(websocket, runner, session_service) -> None:
                 stream_sid = msg["start"]["streamSid"]
                 caller_number = msg["start"].get("customParameters", {}).get(
                     "caller_number", "")
+                user = store.find_by_phone(caller_number) if store and caller_number else None
+                name = user["name"] if user else ""
+                email = user["email"] if user else ""
                 await session_service.create_session(
                     app_name=APP_NAME, user_id=caller_number or "anon",
-                    session_id=stream_sid, state={"caller_phone": caller_number})
-                # Kick the agent to greet first, and give it the caller's number so it
-                # can read it back accurately (session state is visible to tools, not to
-                # the model itself — without this the model would invent a number).
-                known = caller_number or "unknown (ask the caller for it)"
+                    session_id=stream_sid,
+                    state=identity_state(name=name, phone=caller_number, email=email))
+                # Give the model the caller's identity so it greets/reads back accurately
+                # (session state is visible to tools, not to the model itself).
                 live_queue.send_content(types.Content(
                     role="user",
-                    parts=[types.Part(text=(
-                        f"A new caller is on the line. Their phone number from caller ID "
-                        f"is {known}. Greet them warmly as the clinic receptionist, ask how "
-                        f"you can help, and when booking confirm this phone number."))]))
+                    parts=[types.Part(text=greeting_kickoff(
+                        name=name, phone=caller_number, email=email))]))
                 downstream = asyncio.create_task(pump_gemini_to_twilio())
             elif ev == "media":
                 pcm16k = ulaw8k_to_pcm16k(
