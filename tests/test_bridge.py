@@ -103,7 +103,7 @@ async def test_run_call_creates_session_and_bridges_audio_and_barge_in():
     session_service = FakeSessionService()
     runner = FakeRunner([_interrupt_event(), _audio_event(pcm24k)])
 
-    await run_call(ws, runner, session_service, settings=None)
+    await run_call(ws, runner, session_service)
 
     # session created with caller phone from custom parameters
     assert session_service.created[0]["state"] == {"caller_phone": "+15551234567"}

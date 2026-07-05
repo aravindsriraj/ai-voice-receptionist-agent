@@ -8,7 +8,7 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")  # BEFORE reading e
 from fastapi import FastAPI, Request, Response, WebSocket  # noqa: E402
 from app.config import load_settings            # noqa: E402
 from app.twiml import build_connect_stream_twiml  # noqa: E402
-from app.bridge import run_call                 # noqa: E402
+from app.bridge import run_call, APP_NAME       # noqa: E402
 
 settings = load_settings(os.environ)
 app = FastAPI()
@@ -48,7 +48,7 @@ def _build_runtime():
                              settings.clinic_timezone, settings.slot_minutes)
     agent = build_agent(settings, booking, calendar)
     session_service = InMemorySessionService()
-    runner = Runner(app_name="voice-agent", agent=agent, session_service=session_service)
+    runner = Runner(app_name=APP_NAME, agent=agent, session_service=session_service)
     return runner, session_service
 
 
@@ -77,7 +77,7 @@ async def voice(request: Request):
 @app.websocket("/media")
 async def media(websocket: WebSocket):
     runner, session_service = get_runtime()
-    await run_call(websocket, runner, session_service, settings)
+    await run_call(websocket, runner, session_service)
 
 
 @app.post("/tasks/reminders")

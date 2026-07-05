@@ -41,11 +41,12 @@ def is_interrupt(event) -> bool:
 
 
 # ---- orchestration (integration; driven by manual test call) -------------------
-async def run_call(websocket, runner, session_service, settings) -> None:
+async def run_call(websocket, runner, session_service) -> None:
     """Bridge one Twilio Media Stream call to one ADK run_live() session.
 
     session_service is passed explicitly because Runner exposes no public
-    session_service attribute in google-adk 2.3.0.
+    session_service attribute in google-adk 2.3.0. The runner MUST be built with
+    app_name=APP_NAME so run_live() can find the session created here.
     """
     await websocket.accept()
     stream_sid: str | None = None
