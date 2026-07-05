@@ -101,10 +101,16 @@ async def run_call(websocket, runner, session_service) -> None:
                 await session_service.create_session(
                     app_name=APP_NAME, user_id=caller_number or "anon",
                     session_id=stream_sid, state={"caller_phone": caller_number})
-                # kick the agent to greet first
+                # Kick the agent to greet first, and give it the caller's number so it
+                # can read it back accurately (session state is visible to tools, not to
+                # the model itself — without this the model would invent a number).
+                known = caller_number or "unknown (ask the caller for it)"
                 live_queue.send_content(types.Content(
                     role="user",
-                    parts=[types.Part(text="A caller just connected. Greet them.")]))
+                    parts=[types.Part(text=(
+                        f"A new caller is on the line. Their phone number from caller ID "
+                        f"is {known}. Greet them warmly as the clinic receptionist, ask how "
+                        f"you can help, and when booking confirm this phone number."))]))
                 downstream = asyncio.create_task(pump_gemini_to_twilio())
             elif ev == "media":
                 pcm16k = ulaw8k_to_pcm16k(
