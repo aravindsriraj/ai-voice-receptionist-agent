@@ -64,10 +64,17 @@ async def healthz():
     return {"ok": True}
 
 
+def select_caller(direction: str, from_: str, to: str) -> str:
+    """The human party's number. Twilio-initiated (outbound) calls put the human in
+    'To'; inbound calls put them in 'From'."""
+    return (to if (direction or "").startswith("outbound") else from_) or ""
+
+
 @app.post("/voice")
 async def voice(request: Request):
     form = await request.form()
-    caller = form.get("From", "")
+    caller = select_caller(form.get("Direction", "inbound"),
+                           form.get("From", ""), form.get("To", ""))
     ws_host = settings.public_base_url.replace("https://", "").replace("http://", "")
     ws_url = f"wss://{ws_host}/media"
     xml = build_connect_stream_twiml(ws_url, caller)
