@@ -30,12 +30,15 @@ async def run_browser_call(websocket, runner, session_service, user, session_id)
 
     async def downstream():
         ending = False
+        hung_up = False
         async for event in runner.run_live(
                 user_id=email, session_id=session_id,
                 live_request_queue=live_queue, run_config=run_config):
             _log_event(event)
             if is_end_call(event):
                 ending = True
+            if hung_up:
+                continue  # draining until run_live stops after the queue close
             if is_interrupt(event):
                 await websocket.send_json({"type": "interrupt"})
                 continue
@@ -52,7 +55,8 @@ async def run_browser_call(websocket, runner, session_service, user, session_id)
                 await websocket.send_json({"type": "ended"})
                 logger.info("agent ended the browser session")
                 await websocket.close()
-                break
+                hung_up = True
+                live_queue.close()  # end run_live gracefully (no break -> no GeneratorExit)
 
     down_task = asyncio.create_task(downstream())
     try:

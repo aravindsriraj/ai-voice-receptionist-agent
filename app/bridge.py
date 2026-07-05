@@ -87,6 +87,7 @@ async def run_call(websocket, runner, session_service, store=None) -> None:
 
     async def pump_gemini_to_twilio():
         ending = False
+        hung_up = False
         async for event in runner.run_live(
                 user_id=caller_number or "anon", session_id=stream_sid,
                 live_request_queue=live_queue, run_config=run_config):
@@ -95,6 +96,8 @@ async def run_call(websocket, runner, session_service, store=None) -> None:
                 logger.error("live error: %s - %s", event.error_code, event.error_message)
             if is_end_call(event):
                 ending = True
+            if hung_up:
+                continue  # draining until run_live stops after the queue close
             if is_interrupt(event) and stream_sid:
                 await websocket.send_text(twilio_clear_frame(stream_sid))
                 continue
@@ -109,7 +112,8 @@ async def run_call(websocket, runner, session_service, store=None) -> None:
                     await websocket.close()
                 except Exception:
                     pass
-                break
+                hung_up = True
+                live_queue.close()  # end run_live gracefully (no break -> no GeneratorExit)
 
     async def pump_twilio_to_gemini():
         nonlocal stream_sid, caller_number, downstream
