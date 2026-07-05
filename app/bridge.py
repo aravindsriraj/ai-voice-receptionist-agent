@@ -9,6 +9,8 @@ from app.identity import identity_state, greeting_kickoff
 logger = logging.getLogger(__name__)
 
 APP_NAME = "voice-agent"
+# Seconds to let the farewell audio flush before hanging up after the agent's end_call.
+HANGUP_DELAY_S = 1.5
 
 
 # ---- pure helpers (unit-tested) ------------------------------------------------
@@ -39,6 +41,14 @@ def extract_audio_bytes(event) -> list[bytes]:
 
 def is_interrupt(event) -> bool:
     return bool(getattr(event, "interrupted", False))
+
+
+def is_end_call(event) -> bool:
+    """True when the agent invoked the end_call tool (signal to hang up)."""
+    gfc = getattr(event, "get_function_calls", None)
+    if callable(gfc):
+        return any(getattr(fc, "name", "") == "end_call" for fc in (gfc() or []))
+    return False
 
 
 def _log_event(event) -> None:
@@ -76,12 +86,15 @@ async def run_call(websocket, runner, session_service, store=None) -> None:
                            streaming_mode=StreamingMode.BIDI)
 
     async def pump_gemini_to_twilio():
+        ending = False
         async for event in runner.run_live(
                 user_id=caller_number or "anon", session_id=stream_sid,
                 live_request_queue=live_queue, run_config=run_config):
             _log_event(event)
             if getattr(event, "error_code", None):
                 logger.error("live error: %s - %s", event.error_code, event.error_message)
+            if is_end_call(event):
+                ending = True
             if is_interrupt(event) and stream_sid:
                 await websocket.send_text(twilio_clear_frame(stream_sid))
                 continue
@@ -89,6 +102,14 @@ async def run_call(websocket, runner, session_service, store=None) -> None:
                 ulaw = pcm24k_to_ulaw8k(pcm24k, outbound_rs)
                 await websocket.send_text(twilio_media_frame(
                     stream_sid, base64.b64encode(ulaw).decode()))
+            if ending and getattr(event, "turn_complete", False):
+                await asyncio.sleep(HANGUP_DELAY_S)  # let the goodbye audio play out
+                logger.info("agent ended the call; hanging up")
+                try:
+                    await websocket.close()
+                except Exception:
+                    pass
+                break
 
     async def pump_twilio_to_gemini():
         nonlocal stream_sid, caller_number, downstream

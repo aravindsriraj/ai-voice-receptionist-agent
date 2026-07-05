@@ -1,12 +1,13 @@
 from types import SimpleNamespace
 import pytest
+import app.bridge as bridge
 from app.browser_bridge import run_browser_call
 
 
 class FakeWS:
     def __init__(self, inbound_frames):
         self._in = list(inbound_frames); self.sent_bytes = []; self.sent_json = []
-        self.accepted = False
+        self.accepted = False; self.closed = False
 
     async def accept(self): self.accepted = True
 
@@ -18,6 +19,7 @@ class FakeWS:
 
     async def send_bytes(self, b): self.sent_bytes.append(b)
     async def send_json(self, o): self.sent_json.append(o)
+    async def close(self, code=1000): self.closed = True
 
 
 class FakeSession:
@@ -34,6 +36,16 @@ def _audio_event(pcm):
 
 def _interrupt_event():
     return SimpleNamespace(content=None, interrupted=True)
+
+
+def _end_call_event():
+    return SimpleNamespace(content=None, interrupted=False,
+                           get_function_calls=lambda: [SimpleNamespace(name="end_call", args={})])
+
+
+def _turn_complete_event():
+    return SimpleNamespace(content=None, interrupted=False, turn_complete=True,
+                           get_function_calls=lambda: [])
 
 
 class FakeRunner:
@@ -58,3 +70,15 @@ async def test_browser_call_sets_identity_and_streams_pcm():
                                         "caller_email": "j@x.com"}
     assert ws.sent_bytes and ws.sent_bytes[0] == b"\x00\x00" * 2400   # 24k PCM passthrough
     assert {"type": "interrupt"} in ws.sent_json                       # barge-in signal
+
+
+@pytest.mark.asyncio
+async def test_browser_call_ends_on_end_call(monkeypatch):
+    monkeypatch.setattr(bridge, "HANGUP_DELAY_S", 0)
+    ws = FakeWS([b"\x01\x02" * 160])
+    runner = FakeRunner([_audio_event(b"\x00\x00" * 2400),
+                         _end_call_event(), _turn_complete_event()])
+    user = {"name": "Jane", "mobile": "+15551234567", "email": "j@x.com"}
+    await run_browser_call(ws, runner, FakeSession(), user, session_id="s1")
+    assert {"type": "ended"} in ws.sent_json
+    assert ws.closed is True

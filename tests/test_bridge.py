@@ -1,8 +1,10 @@
 import audioop, base64, json
 from types import SimpleNamespace
 import pytest
+import app.bridge as bridge
 from app.bridge import (run_call, parse_twilio_message, twilio_media_frame,
-                        twilio_clear_frame, extract_audio_bytes, is_interrupt)
+                        twilio_clear_frame, extract_audio_bytes, is_interrupt,
+                        is_end_call)
 
 
 def test_parse_twilio_message():
@@ -37,6 +39,14 @@ def test_is_interrupt():
     assert is_interrupt(SimpleNamespace()) is False
 
 
+def test_is_end_call():
+    end = SimpleNamespace(get_function_calls=lambda: [SimpleNamespace(name="end_call")])
+    other = SimpleNamespace(get_function_calls=lambda: [SimpleNamespace(name="book_appointment")])
+    assert is_end_call(end) is True
+    assert is_end_call(other) is False
+    assert is_end_call(SimpleNamespace()) is False
+
+
 # ---- integration: run_call orchestration with fakes ---------------------------
 
 class FakeWebSocket:
@@ -44,17 +54,22 @@ class FakeWebSocket:
         self._incoming = list(incoming)
         self.sent = []
         self.accepted = False
+        self.closed = False
 
     async def accept(self):
         self.accepted = True
 
     async def receive_text(self):
         if not self._incoming:
-            raise AssertionError("run_call read past the provided messages")
+            from starlette.websockets import WebSocketDisconnect
+            raise WebSocketDisconnect(1000)
         return self._incoming.pop(0)
 
     async def send_text(self, text):
         self.sent.append(text)
+
+    async def close(self, code=1000):
+        self.closed = True
 
 
 class FakeSessionService:
@@ -79,6 +94,16 @@ def _audio_event(pcm24k_bytes):
 
 def _interrupt_event():
     return SimpleNamespace(content=None, interrupted=True)
+
+
+def _end_call_event():
+    return SimpleNamespace(content=None, interrupted=False,
+                           get_function_calls=lambda: [SimpleNamespace(name="end_call", args={})])
+
+
+def _turn_complete_event():
+    return SimpleNamespace(content=None, interrupted=False, turn_complete=True,
+                           get_function_calls=lambda: [])
 
 
 class FakeRunner:
@@ -125,3 +150,15 @@ async def test_run_call_creates_session_and_bridges_audio_and_barge_in():
     media_frame = next(json.loads(s) for s in ws.sent if json.loads(s)["event"] == "media")
     assert media_frame["streamSid"] == "MZ123"
     assert len(base64.b64decode(media_frame["media"]["payload"])) > 0
+
+
+@pytest.mark.asyncio
+async def test_run_call_hangs_up_when_agent_ends(monkeypatch):
+    monkeypatch.setattr(bridge, "HANGUP_DELAY_S", 0)
+    start = json.dumps({"event": "start", "start": {
+        "streamSid": "MZ9", "customParameters": {"caller_number": "+15551234567"}}})
+    ws = FakeWebSocket([start])
+    runner = FakeRunner([_audio_event(b"\x00\x00" * 2400),
+                         _end_call_event(), _turn_complete_event()])
+    await run_call(ws, runner, FakeSessionService(), store=FakeStore(None))
+    assert ws.closed is True   # agent's end_call hung up the call

@@ -1,6 +1,7 @@
 const logEl = document.getElementById("log");
 const orb = document.getElementById("orb");
 const talkBtn = document.getElementById("talk");
+const statusEl = document.getElementById("status");
 
 function bubble(role, text) {
   const d = document.createElement("div");
@@ -8,6 +9,11 @@ function bubble(role, text) {
   d.textContent = text;
   logEl.appendChild(d);
   logEl.scrollTop = logEl.scrollHeight;
+}
+
+function setStatus(state, text) {
+  statusEl.className = "status" + (state ? " " + state : "");
+  statusEl.textContent = text;
 }
 
 // greet by first name
@@ -22,6 +28,7 @@ document.getElementById("callme").onclick = async () => {
 
 talkBtn.onclick = async () => {
   talkBtn.disabled = true;
+  let ended = false;
   const proto = location.protocol === "https:" ? "wss" : "ws";
   const ws = new WebSocket(`${proto}://${location.host}/ws/talk`);
   ws.binaryType = "arraybuffer";
@@ -33,15 +40,30 @@ talkBtn.onclick = async () => {
   const player = new AudioWorkletNode(playCtx, "pcm-player-processor");
   player.connect(playCtx.destination);
 
-  ws.onopen = () => { orb.classList.add("live"); bubble("system", "Connected — start speaking."); };
-  ws.onclose = () => { orb.classList.remove("live"); talkBtn.disabled = false; };
+  function finish(text) {
+    if (ended) return;
+    ended = true;
+    orb.classList.remove("live");
+    orb.classList.add("ended");
+    setStatus("ended", text);
+    talkBtn.disabled = false;
+  }
+
+  ws.onopen = () => {
+    orb.classList.remove("ended");
+    orb.classList.add("live");
+    setStatus("live", "Live — listening");
+    bubble("system", "Connected — start speaking.");
+  };
   ws.onerror = () => bubble("system", "Connection error.");
+  ws.onclose = () => finish("Call ended");
 
   ws.onmessage = (e) => {
     if (typeof e.data === "string") {
       const m = JSON.parse(e.data);
       if (m.type === "interrupt") player.port.postMessage({ command: "endOfAudio" });
       else if (m.type === "transcript") bubble(m.role, m.text);
+      else if (m.type === "ended") finish("Call ended");
     } else {
       player.port.postMessage(e.data);   // 24kHz PCM
     }

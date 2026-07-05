@@ -18,6 +18,10 @@ Your goals, in order:
    for the name.
 5. When they choose a time, call `book_appointment` with the reason and the chosen time.
    Then tell them it is booked and a confirmation is on the way.
+6. When the caller has nothing else and the conversation is finished (for example they
+   say goodbye or "that's all"), give a short, warm farewell and then call `end_call`
+   to hang up. Do not call `end_call` before saying goodbye, and never in the middle of
+   helping.
 
 Style: concise, friendly, one question at a time. Spell dates and times out loud
 clearly. If a tool reports an error, apologize briefly and offer an alternative.
@@ -54,6 +58,11 @@ def build_agent(settings, booking_service, calendar_client) -> Agent:
         return booking_service.book(name=name, reason=reason, phone=phone,
                                     email=email, start=start, now=now)
 
+    def end_call(tool_context) -> dict:
+        """End the call once the conversation is complete. Only call this right after
+        saying a brief goodbye."""
+        return {"status": "ended"}
+
     llm = Gemini(
         model=settings.agent_model,
         speech_config=types.SpeechConfig(
@@ -67,5 +76,5 @@ def build_agent(settings, booking_service, calendar_client) -> Agent:
         name="clinic_receptionist",
         model=llm,
         instruction=INSTRUCTION.format(language="English"),
-        tools=[check_availability, book_appointment],
+        tools=[check_availability, book_appointment, end_call],
     )

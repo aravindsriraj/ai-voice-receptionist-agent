@@ -94,7 +94,15 @@ body {
 .console .sub { color: var(--muted); margin: 0 0 2.2rem; }
 
 /* signature: the listening orb */
-.orb-wrap { display: grid; place-items: center; height: 160px; margin-bottom: 1.6rem; }
+.orb-wrap { display: grid; place-items: center; height: 160px; margin-bottom: .9rem; }
+.orb.ended { filter: grayscale(.65); opacity: .45; }
+
+.status { display: inline-flex; align-items: center; gap: .45rem; font-size: .85rem;
+  color: var(--muted); margin-bottom: 1.6rem; }
+.status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #C3CCC7; }
+.status.live { color: var(--accent); font-weight: 600; }
+.status.live::before { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-weak); }
+.status.ended { color: var(--muted); }
 .orb { position: relative; width: 92px; height: 92px; border-radius: 50%;
   background: radial-gradient(circle at 38% 32%, #fff 0 8%, var(--accent-weak) 12% 55%, var(--accent) 100%);
   box-shadow: 0 10px 30px rgba(15,122,99,.25); }

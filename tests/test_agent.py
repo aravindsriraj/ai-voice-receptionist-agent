@@ -31,11 +31,10 @@ def test_instruction_is_english_and_has_persona():
     assert "receptionist" in text.lower()
 
 
-def test_agent_registers_two_tools():
+def test_agent_registers_tools():
     agent = build_agent(_settings(), FakeBooking(), FakeCalendar())
     tool_names = {getattr(t, "__name__", getattr(t, "name", "")) for t in agent.tools}
-    assert "check_availability" in tool_names
-    assert "book_appointment" in tool_names
+    assert {"check_availability", "book_appointment", "end_call"} <= tool_names
 
 
 def test_book_tool_reads_identity_from_state():

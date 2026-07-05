@@ -3,7 +3,8 @@ import asyncio, logging
 from google.adk.agents.run_config import RunConfig, StreamingMode
 from google.adk.agents.live_request_queue import LiveRequestQueue
 from google.genai import types
-from app.bridge import APP_NAME, extract_audio_bytes, is_interrupt, _log_event
+import app.bridge as bridge
+from app.bridge import APP_NAME, extract_audio_bytes, is_interrupt, is_end_call, _log_event
 from app.identity import identity_state, greeting_kickoff
 
 logger = logging.getLogger(__name__)
@@ -28,10 +29,13 @@ async def run_browser_call(websocket, runner, session_service, user, session_id)
         parts=[types.Part(text=greeting_kickoff(name=name, phone=phone, email=email))]))
 
     async def downstream():
+        ending = False
         async for event in runner.run_live(
                 user_id=email, session_id=session_id,
                 live_request_queue=live_queue, run_config=run_config):
             _log_event(event)
+            if is_end_call(event):
+                ending = True
             if is_interrupt(event):
                 await websocket.send_json({"type": "interrupt"})
                 continue
@@ -43,6 +47,12 @@ async def run_browser_call(websocket, runner, session_service, user, session_id)
                 await websocket.send_json({"type": "transcript", "role": "user", "text": it.text})
             for pcm in extract_audio_bytes(event):
                 await websocket.send_bytes(pcm)
+            if ending and getattr(event, "turn_complete", False):
+                await asyncio.sleep(bridge.HANGUP_DELAY_S)  # let the goodbye play
+                await websocket.send_json({"type": "ended"})
+                logger.info("agent ended the browser session")
+                await websocket.close()
+                break
 
     down_task = asyncio.create_task(downstream())
     try:
