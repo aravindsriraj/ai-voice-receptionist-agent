@@ -28,3 +28,9 @@ def test_load_settings_web_fields():
     s = load_settings(BASE_ENV)
     assert s.session_secret == "sekret"
     assert s.twilio_caller_number == "+12542745055"
+
+
+def test_channel_flags_default_on_and_parse_off():
+    assert load_settings(BASE_ENV).whatsapp_enabled is True   # default on
+    env = dict(BASE_ENV); env["WHATSAPP_ENABLED"] = "false"
+    assert load_settings(env).whatsapp_enabled is False

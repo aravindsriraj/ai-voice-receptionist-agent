@@ -14,13 +14,15 @@ def format_when(start: datetime, tz_name: str) -> str:
 
 class BookingService:
     def __init__(self, calendar, store, notifier, tz_name: str, slot_minutes: int,
-                 email_enabled: bool = True, background=None):
+                 email_enabled: bool = True, whatsapp_enabled: bool = True,
+                 background=None):
         self.calendar = calendar
         self.store = store
         self.notifier = notifier
         self._tz_name = tz_name
         self._slot_minutes = slot_minutes
         self._email_enabled = email_enabled
+        self._whatsapp_enabled = whatsapp_enabled
         # `background(fn)` runs fn off the booking's critical path so the agent can
         # confirm immediately. Default runs inline (used by tests); production passes a
         # thread-pool submit so WhatsApp/email don't block the agent's response.
@@ -51,11 +53,14 @@ class BookingService:
 
     def _send_confirmations(self, name, phone, email, when) -> None:
         wa_body, subject, html = confirmation_texts(name, when)
-        try:
-            self.notifier.send_whatsapp(phone, wa_body)
-            logger.info("whatsapp confirmation sent to %s", phone)
-        except Exception:
-            logger.exception("whatsapp confirmation FAILED for %s", phone)
+        # Email is the primary channel (reaches any registered user). WhatsApp is
+        # optional and only works with a joined sandbox number or a real WABA sender.
+        if self._whatsapp_enabled and phone:
+            try:
+                self.notifier.send_whatsapp(phone, wa_body)
+                logger.info("whatsapp confirmation sent to %s", phone)
+            except Exception:
+                logger.exception("whatsapp confirmation FAILED for %s", phone)
         if self._email_enabled and email:
             try:
                 self.notifier.send_email(email, subject, html)

@@ -86,6 +86,7 @@ def _build_runtime():
     booking = BookingService(calendar, _build_store(), _build_notifier(),
                              settings.clinic_timezone, settings.slot_minutes,
                              email_enabled=settings.email_enabled,
+                             whatsapp_enabled=settings.whatsapp_enabled,
                              background=_bg_executor.submit)
     agent = build_agent(settings, booking, calendar)
     session_service = InMemorySessionService()
@@ -151,4 +152,5 @@ async def reminders_task():
     now = datetime.now(ZoneInfo(settings.clinic_timezone))
     return dispatch_due_reminders(_build_store(), _build_notifier(),
                                   settings.clinic_timezone, now,
-                                  email_enabled=settings.email_enabled)
+                                  email_enabled=settings.email_enabled,
+                                  whatsapp_enabled=settings.whatsapp_enabled)

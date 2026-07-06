@@ -60,6 +60,17 @@ def test_book_defers_confirmations_to_background():
     assert len(svc.notifier.wa) == 1 and len(svc.notifier.email) == 1
 
 
+def test_whatsapp_disabled_still_emails():
+    # email is the primary channel; WhatsApp off must not affect it
+    svc = BookingService(FakeCalendar(), FakeStore(), FakeNotifier(), TZ, 30,
+                         email_enabled=True, whatsapp_enabled=False)
+    start = datetime(2026, 7, 8, 10, tzinfo=ZoneInfo(TZ))
+    now = datetime(2026, 7, 6, 9, tzinfo=ZoneInfo(TZ))
+    svc.book("Jane", "checkup", "+15551234567", "j@x.com", start, now)
+    assert svc.notifier.wa == []                 # WhatsApp skipped
+    assert len(svc.notifier.email) == 1          # email still sent
+
+
 def test_book_rejects_past_start():
     svc = _svc()
     past = datetime(2026, 7, 6, 8, tzinfo=ZoneInfo(TZ))

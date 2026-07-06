@@ -18,6 +18,7 @@ class Settings:
     resend_api_key: str
     email_from: str
     email_enabled: bool
+    whatsapp_enabled: bool
     session_secret: str
     twilio_caller_number: str
     public_base_url: str
@@ -38,6 +39,8 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         resend_api_key=env["RESEND_API_KEY"],
         email_from=env["EMAIL_FROM"],
         email_enabled=env.get("EMAIL_ENABLED", "true").strip().lower()
+        not in ("false", "0", "no", "off"),
+        whatsapp_enabled=env.get("WHATSAPP_ENABLED", "true").strip().lower()
         not in ("false", "0", "no", "off"),
         session_secret=env["SESSION_SECRET"],
         twilio_caller_number=env["TWILIO_CALLER_NUMBER"],
