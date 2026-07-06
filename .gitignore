@@ -9,3 +9,8 @@ service-account.json
 venv/
 build/
 dist/
+
+# local agent tooling (not part of the product)
+.mcp.json
+opencode.json
+skills-lock.json
