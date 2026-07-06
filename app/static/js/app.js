@@ -23,7 +23,12 @@ fetch("/api/me").then(r => (r.ok ? r.json() : null)).then(u => {
 
 document.getElementById("callme").onclick = async () => {
   const r = await fetch("/api/call-me", { method: "POST" });
-  bubble("system", r.ok ? "Calling your phone now — pick up to talk." : "Couldn't place the call.");
+  if (r.ok) {
+    bubble("system", "Calling your phone now — pick up to talk.");
+  } else {
+    const d = await r.json().catch(() => ({}));
+    bubble("system", d.error || "Couldn't place the call. Please try again.");
+  }
 };
 
 talkBtn.onclick = async () => {

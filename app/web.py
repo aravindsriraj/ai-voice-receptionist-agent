@@ -72,9 +72,17 @@ def make_router(get_store, get_twilio, settings, static_dir) -> APIRouter:
         if not user:
             raise HTTPException(status_code=401, detail="not logged in")
         base = settings.public_base_url.rstrip("/")
-        call = get_twilio().calls.create(
-            to=user["mobile"], from_=settings.twilio_caller_number,
-            url=f"{base}/voice", method="POST")
+        try:
+            call = get_twilio().calls.create(
+                to=user["mobile"], from_=settings.twilio_caller_number,
+                url=f"{base}/voice", method="POST")
+        except Exception as e:
+            logger.warning("call-me failed for %s: %s", user["mobile"], e)
+            msg = "We couldn't place the call."
+            if "unverified" in str(e).lower() or "not verified" in str(e).lower():
+                msg = ("This number isn't verified for calling yet. On our current phone "
+                       "plan we can only call verified numbers — try the browser instead.")
+            return JSONResponse({"error": msg}, status_code=502)
         return {"sid": call.sid, "status": call.status, "to": user["mobile"]}
 
     return router
