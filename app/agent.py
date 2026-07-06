@@ -1,9 +1,12 @@
 from __future__ import annotations
+import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from google.adk.agents import Agent
 from google.adk.models.google_llm import Gemini
 from google.genai import types
+
+logger = logging.getLogger(__name__)
 
 INSTRUCTION = """You are a warm, professional voice receptionist for a medical clinic.
 You are speaking on a live phone call. Converse naturally in {language}.
@@ -43,26 +46,36 @@ def build_agent(settings, booking_service, calendar_client) -> Agent:
 
     def check_availability(date_iso: str, tool_context) -> dict:
         """Return open appointment slots for a given date (YYYY-MM-DD)."""
-        date = datetime.fromisoformat(date_iso).date()
-        now = _now_tz(tz_name)
-        slots = calendar_client.available_slots(date, now)
-        return {"date": date_iso,
-                "slots": [s.strftime("%-I:%M %p") for s in slots],
-                "iso_slots": [s.isoformat() for s in slots]}
+        try:
+            date = datetime.fromisoformat(date_iso).date()
+            now = _now_tz(tz_name)
+            slots = calendar_client.available_slots(date, now)
+            return {"date": date_iso,
+                    "slots": [s.strftime("%-I:%M %p") for s in slots],
+                    "iso_slots": [s.isoformat() for s in slots]}
+        except Exception:
+            logger.exception("check_availability failed for %s", date_iso)
+            return {"error": "I'm having trouble reaching the calendar right now. "
+                             "Please ask me to check again in a moment."}
 
     def book_appointment(reason: str, start_iso: str, tool_context,
                          name: str = "", email: str = "") -> dict:
         """Book an appointment. start_iso must be one of the iso_slots from
         check_availability. Caller name/phone/email come from session state (on file);
         name/email params are optional overrides."""
-        st = tool_context.state
-        name = name or st.get("caller_name", "")
-        email = email or st.get("caller_email", "")
-        phone = st.get("caller_phone", "")
-        start = datetime.fromisoformat(start_iso)
-        now = _now_tz(tz_name)
-        return booking_service.book(name=name, reason=reason, phone=phone,
-                                    email=email, start=start, now=now)
+        try:
+            st = tool_context.state
+            name = name or st.get("caller_name", "")
+            email = email or st.get("caller_email", "")
+            phone = st.get("caller_phone", "")
+            start = datetime.fromisoformat(start_iso)
+            now = _now_tz(tz_name)
+            return booking_service.book(name=name, reason=reason, phone=phone,
+                                        email=email, start=start, now=now)
+        except Exception:
+            logger.exception("book_appointment failed for start=%s", start_iso)
+            return {"ok": False, "message": "I couldn't complete the booking just now. "
+                    "Please try again in a moment."}
 
     def end_call(tool_context) -> dict:
         """End the call once the conversation is complete. Only call this right after

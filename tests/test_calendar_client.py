@@ -7,7 +7,7 @@ TZ = "America/New_York"
 
 class _Exec:
     def __init__(self, result): self._r = result
-    def execute(self): return self._r
+    def execute(self, **kwargs): return self._r   # accepts num_retries=
 
 
 class _Freebusy:
@@ -33,7 +33,7 @@ class FakeService:
 def test_available_slots_excludes_busy():
     busy = [{"start": "2026-07-08T09:00:00-04:00", "end": "2026-07-08T09:30:00-04:00"}]
     svc = FakeService(busy)
-    c = CalendarClient(svc, "cal@x", TZ, 9, 11, 30)
+    c = CalendarClient(lambda: svc, "cal@x", TZ, 9, 11, 30)
     now = datetime(2026, 7, 8, 8, tzinfo=ZoneInfo(TZ))
     slots = c.available_slots(now.date(), now)
     labels = [s.strftime("%H:%M") for s in slots]
@@ -42,7 +42,7 @@ def test_available_slots_excludes_busy():
 
 def test_create_event_returns_id_and_builds_body():
     svc = FakeService([])
-    c = CalendarClient(svc, "cal@x", TZ, 9, 17, 30)
+    c = CalendarClient(lambda: svc, "cal@x", TZ, 9, 17, 30)
     start = datetime(2026, 7, 8, 10, tzinfo=ZoneInfo(TZ))
     eid = c.create_event("Checkup - Jane", "reason: checkup", start, 30)
     assert eid == "evt_123"

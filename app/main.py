@@ -78,10 +78,10 @@ def _build_runtime():
     from google.adk.sessions import InMemorySessionService
     from app.agent import build_agent
     from app.booking import BookingService
-    from app.calendar_client import CalendarClient, build_google_service
+    from app.calendar_client import CalendarClient, calendar_service_factory
 
-    gcal = build_google_service(os.environ["GOOGLE_APPLICATION_CREDENTIALS"])
-    calendar = CalendarClient(gcal, settings.clinic_calendar_id, settings.clinic_timezone,
+    factory = calendar_service_factory(os.environ["GOOGLE_APPLICATION_CREDENTIALS"])
+    calendar = CalendarClient(factory, settings.clinic_calendar_id, settings.clinic_timezone,
                               settings.open_hour, settings.close_hour, settings.slot_minutes)
     booking = BookingService(calendar, _build_store(), _build_notifier(),
                              settings.clinic_timezone, settings.slot_minutes,
