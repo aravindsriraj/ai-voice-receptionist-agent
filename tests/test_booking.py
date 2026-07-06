@@ -42,6 +42,24 @@ def test_book_success_creates_event_persists_and_notifies():
     assert len(svc.notifier.wa) == 1 and len(svc.notifier.email) == 1
 
 
+def test_book_defers_confirmations_to_background():
+    svc = _svc()
+    jobs = []
+    svc._background = lambda fn: jobs.append(fn)   # defer instead of running inline
+    start = datetime(2026, 7, 8, 10, tzinfo=ZoneInfo(TZ))
+    now = datetime(2026, 7, 6, 9, tzinfo=ZoneInfo(TZ))
+    res = svc.book("Jane", "checkup", "+15551234567", "j@x.com", start, now)
+    # booking (calendar + persist) happened synchronously and returned ok...
+    assert res["ok"] is True
+    assert svc.calendar.created and svc.store.rows
+    # ...but confirmations have NOT been sent yet — they're queued for the background
+    assert svc.notifier.wa == [] and svc.notifier.email == []
+    # running the backgrounded job sends them
+    for job in jobs:
+        job()
+    assert len(svc.notifier.wa) == 1 and len(svc.notifier.email) == 1
+
+
 def test_book_rejects_past_start():
     svc = _svc()
     past = datetime(2026, 7, 6, 8, tzinfo=ZoneInfo(TZ))

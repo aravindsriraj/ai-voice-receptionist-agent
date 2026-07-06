@@ -1,6 +1,7 @@
 from __future__ import annotations
 import os
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -38,6 +39,8 @@ app.mount("/static", StaticFiles(directory=str(_STATIC)), name="static")
 # stays importable without live credentials (CI, Docker build, tests).
 _runtime = None
 _user_store = None
+# Runs fire-and-forget confirmations off the agent's critical path so booking replies fast.
+_bg_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="notify")
 
 
 def _build_store():
@@ -82,7 +85,8 @@ def _build_runtime():
                               settings.open_hour, settings.close_hour, settings.slot_minutes)
     booking = BookingService(calendar, _build_store(), _build_notifier(),
                              settings.clinic_timezone, settings.slot_minutes,
-                             email_enabled=settings.email_enabled)
+                             email_enabled=settings.email_enabled,
+                             background=_bg_executor.submit)
     agent = build_agent(settings, booking, calendar)
     session_service = InMemorySessionService()
     runner = Runner(app_name=APP_NAME, agent=agent, session_service=session_service)
