@@ -7,6 +7,7 @@ BASE_ENV = {
     "TWILIO_ACCOUNT_SID": "AC1", "TWILIO_AUTH_TOKEN": "t",
     "TWILIO_WHATSAPP_FROM": "whatsapp:+1", "RESEND_API_KEY": "re_1",
     "EMAIL_FROM": "Clinic <a@b.com>", "PUBLIC_BASE_URL": "https://x",
+    "SESSION_SECRET": "sekret", "TWILIO_CALLER_NUMBER": "+12542745055",
 }
 
 
@@ -21,3 +22,15 @@ def test_load_settings_missing_key_raises():
     env = dict(BASE_ENV); del env["TWILIO_AUTH_TOKEN"]
     with pytest.raises(KeyError):
         load_settings(env)
+
+
+def test_load_settings_web_fields():
+    s = load_settings(BASE_ENV)
+    assert s.session_secret == "sekret"
+    assert s.twilio_caller_number == "+12542745055"
+
+
+def test_channel_flags_default_on_and_parse_off():
+    assert load_settings(BASE_ENV).whatsapp_enabled is True   # default on
+    env = dict(BASE_ENV); env["WHATSAPP_ENABLED"] = "false"
+    assert load_settings(env).whatsapp_enabled is False

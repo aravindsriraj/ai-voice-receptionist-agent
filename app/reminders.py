@@ -9,17 +9,19 @@ logger = logging.getLogger(__name__)
 
 
 def dispatch_due_reminders(store, notifier, tz_name: str, now: datetime,
-                           email_enabled: bool = True) -> dict:
+                           email_enabled: bool = True,
+                           whatsapp_enabled: bool = True) -> dict:
     due = select_due_reminders(store.list_booked(), now)
     kinds = []
     for appt, kind in due:
         when = format_when(appt["start"], tz_name)
         wa_body, subject, html = reminder_texts(appt["name"], when, kind)
-        try:
-            notifier.send_whatsapp(appt["phone"], wa_body)
-            logger.info("whatsapp %s reminder sent to %s", kind, appt["phone"])
-        except Exception:
-            logger.exception("whatsapp %s reminder FAILED for %s", kind, appt["phone"])
+        if whatsapp_enabled and appt.get("phone"):
+            try:
+                notifier.send_whatsapp(appt["phone"], wa_body)
+                logger.info("whatsapp %s reminder sent to %s", kind, appt["phone"])
+            except Exception:
+                logger.exception("whatsapp %s reminder FAILED for %s", kind, appt["phone"])
         if email_enabled and appt.get("email"):
             try:
                 notifier.send_email(appt["email"], subject, html)

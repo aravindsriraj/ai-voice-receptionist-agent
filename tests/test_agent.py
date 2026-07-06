@@ -31,31 +31,37 @@ def test_instruction_is_english_and_has_persona():
     assert "receptionist" in text.lower()
 
 
-def test_agent_registers_two_tools():
+def test_agent_registers_tools():
     agent = build_agent(_settings(), FakeBooking(), FakeCalendar())
     tool_names = {getattr(t, "__name__", getattr(t, "name", "")) for t in agent.tools}
-    assert "check_availability" in tool_names
-    assert "book_appointment" in tool_names
+    assert {"check_availability", "book_appointment", "end_call"} <= tool_names
 
 
-def test_book_tool_reads_caller_phone_from_state():
+def test_book_tool_reads_identity_from_state():
     booking = FakeBooking()
     agent = build_agent(_settings(), booking, FakeCalendar())
     book_tool = next(t for t in agent.tools
                      if getattr(t, "__name__", "") == "book_appointment")
-    ctx = SimpleNamespace(state={"caller_phone": "+15551234567"})
-    # email is optional now — omit it
-    result = book_tool(name="Jane", reason="checkup",
+    ctx = SimpleNamespace(state={"caller_phone": "+15551234567",
+                                 "caller_name": "Jane", "caller_email": "j@x.com"})
+    result = book_tool(reason="checkup",
                        start_iso="2026-07-08T10:00:00-04:00", tool_context=ctx)
     assert result["ok"] is True
-    assert booking.calls[0][2] == "+15551234567"   # phone came from state
+    name, reason, phone, email, start = booking.calls[0]
+    assert phone == "+15551234567" and name == "Jane" and email == "j@x.com"
 
 
-def test_email_policy_reflects_flag():
-    on = build_agent(_settings(email_enabled=True), FakeBooking(), FakeCalendar())
-    off = build_agent(_settings(email_enabled=False), FakeBooking(), FakeCalendar())
-    assert "email address" in on.instruction.lower()
-    assert "whatsapp only" in off.instruction.lower()
+def test_instruction_does_not_ask_for_email():
+    text = build_agent(_settings(), FakeBooking(), FakeCalendar()).instruction
+    assert "receptionist" in text.lower()
+    assert "email" in text.lower()   # it mentions not to ask for email
+
+
+def test_instruction_mandates_booking_tool_before_confirming():
+    text = build_agent(_settings(), FakeBooking(), FakeCalendar()).instruction.lower()
+    assert "book_appointment" in text
+    # must forbid claiming a booking without calling the tool
+    assert "must call" in text and "never tell the caller" in text
 
 
 def test_booking_disabled_email_not_sent():

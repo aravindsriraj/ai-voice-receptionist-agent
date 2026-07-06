@@ -4,10 +4,13 @@ from google.adk.agents.run_config import RunConfig, StreamingMode
 from google.adk.agents.live_request_queue import LiveRequestQueue
 from google.genai import types
 from app.audio import Resampler, ulaw8k_to_pcm16k, pcm24k_to_ulaw8k
+from app.identity import identity_state, greeting_kickoff
 
 logger = logging.getLogger(__name__)
 
 APP_NAME = "voice-agent"
+# Seconds to let the farewell audio flush before hanging up after the agent's end_call.
+HANGUP_DELAY_S = 1.5
 
 
 # ---- pure helpers (unit-tested) ------------------------------------------------
@@ -40,6 +43,14 @@ def is_interrupt(event) -> bool:
     return bool(getattr(event, "interrupted", False))
 
 
+def is_end_call(event) -> bool:
+    """True when the agent invoked the end_call tool (signal to hang up)."""
+    gfc = getattr(event, "get_function_calls", None)
+    if callable(gfc):
+        return any(getattr(fc, "name", "") == "end_call" for fc in (gfc() or []))
+    return False
+
+
 def _log_event(event) -> None:
     """Best-effort visibility into the live conversation (tool calls + final transcripts).
     Guarded with getattr so it is safe for both real ADK events and test doubles."""
@@ -56,12 +67,13 @@ def _log_event(event) -> None:
 
 
 # ---- orchestration (integration; driven by manual test call) -------------------
-async def run_call(websocket, runner, session_service) -> None:
+async def run_call(websocket, runner, session_service, store=None) -> None:
     """Bridge one Twilio Media Stream call to one ADK run_live() session.
 
     session_service is passed explicitly because Runner exposes no public
     session_service attribute in google-adk 2.3.0. The runner MUST be built with
-    app_name=APP_NAME so run_live() can find the session created here.
+    app_name=APP_NAME so run_live() can find the session created here. When a `store`
+    is given, the caller is looked up by phone to enrich session state with name/email.
     """
     await websocket.accept()
     stream_sid: str | None = None
@@ -74,12 +86,18 @@ async def run_call(websocket, runner, session_service) -> None:
                            streaming_mode=StreamingMode.BIDI)
 
     async def pump_gemini_to_twilio():
+        ending = False
+        hung_up = False
         async for event in runner.run_live(
                 user_id=caller_number or "anon", session_id=stream_sid,
                 live_request_queue=live_queue, run_config=run_config):
             _log_event(event)
             if getattr(event, "error_code", None):
                 logger.error("live error: %s - %s", event.error_code, event.error_message)
+            if is_end_call(event):
+                ending = True
+            if hung_up:
+                continue  # draining until run_live stops after the queue close
             if is_interrupt(event) and stream_sid:
                 await websocket.send_text(twilio_clear_frame(stream_sid))
                 continue
@@ -87,6 +105,15 @@ async def run_call(websocket, runner, session_service) -> None:
                 ulaw = pcm24k_to_ulaw8k(pcm24k, outbound_rs)
                 await websocket.send_text(twilio_media_frame(
                     stream_sid, base64.b64encode(ulaw).decode()))
+            if ending and getattr(event, "turn_complete", False):
+                await asyncio.sleep(HANGUP_DELAY_S)  # let the goodbye audio play out
+                logger.info("agent ended the call; hanging up")
+                try:
+                    await websocket.close()
+                except Exception:
+                    pass
+                hung_up = True
+                live_queue.close()  # end run_live gracefully (no break -> no GeneratorExit)
 
     async def pump_twilio_to_gemini():
         nonlocal stream_sid, caller_number, downstream
@@ -98,19 +125,19 @@ async def run_call(websocket, runner, session_service) -> None:
                 stream_sid = msg["start"]["streamSid"]
                 caller_number = msg["start"].get("customParameters", {}).get(
                     "caller_number", "")
+                user = store.find_by_phone(caller_number) if store and caller_number else None
+                name = user["name"] if user else ""
+                email = user["email"] if user else ""
                 await session_service.create_session(
                     app_name=APP_NAME, user_id=caller_number or "anon",
-                    session_id=stream_sid, state={"caller_phone": caller_number})
-                # Kick the agent to greet first, and give it the caller's number so it
-                # can read it back accurately (session state is visible to tools, not to
-                # the model itself — without this the model would invent a number).
-                known = caller_number or "unknown (ask the caller for it)"
+                    session_id=stream_sid,
+                    state=identity_state(name=name, phone=caller_number, email=email))
+                # Give the model the caller's identity so it greets/reads back accurately
+                # (session state is visible to tools, not to the model itself).
                 live_queue.send_content(types.Content(
                     role="user",
-                    parts=[types.Part(text=(
-                        f"A new caller is on the line. Their phone number from caller ID "
-                        f"is {known}. Greet them warmly as the clinic receptionist, ask how "
-                        f"you can help, and when booking confirm this phone number."))]))
+                    parts=[types.Part(text=greeting_kickoff(
+                        name=name, phone=caller_number, email=email))]))
                 downstream = asyncio.create_task(pump_gemini_to_twilio())
             elif ev == "media":
                 pcm16k = ulaw8k_to_pcm16k(
