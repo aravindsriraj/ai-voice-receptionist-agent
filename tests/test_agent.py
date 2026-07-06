@@ -57,6 +57,13 @@ def test_instruction_does_not_ask_for_email():
     assert "email" in text.lower()   # it mentions not to ask for email
 
 
+def test_instruction_mandates_booking_tool_before_confirming():
+    text = build_agent(_settings(), FakeBooking(), FakeCalendar()).instruction.lower()
+    assert "book_appointment" in text
+    # must forbid claiming a booking without calling the tool
+    assert "must call" in text and "never tell the caller" in text
+
+
 def test_booking_disabled_email_not_sent():
     from app.booking import BookingService
 
