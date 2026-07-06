@@ -21,6 +21,7 @@ class Settings:
     whatsapp_enabled: bool
     session_secret: str
     twilio_caller_number: str
+    reminders_token: str
     public_base_url: str
 
 
@@ -44,5 +45,7 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         not in ("false", "0", "no", "off"),
         session_secret=env["SESSION_SECRET"],
         twilio_caller_number=env["TWILIO_CALLER_NUMBER"],
+        # Optional: when set, /tasks/reminders requires this token (Cloud Scheduler sends it).
+        reminders_token=env.get("REMINDERS_TOKEN", ""),
         public_base_url=env["PUBLIC_BASE_URL"],
     )

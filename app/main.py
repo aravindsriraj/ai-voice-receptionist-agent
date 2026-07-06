@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")  # BEFORE reading env
 
-from fastapi import FastAPI, Request, Response, WebSocket  # noqa: E402
+from fastapi import FastAPI, Request, Response, WebSocket, HTTPException  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 from starlette.middleware.sessions import SessionMiddleware  # noqa: E402
 from app.config import load_settings            # noqa: E402
@@ -146,7 +146,11 @@ async def ws_talk(websocket: WebSocket):
 
 
 @app.post("/tasks/reminders")
-async def reminders_task():
+async def reminders_task(request: Request):
+    # When a token is configured, only callers presenting it (Cloud Scheduler) may trigger.
+    if settings.reminders_token and \
+            request.headers.get("x-reminders-token") != settings.reminders_token:
+        raise HTTPException(status_code=403, detail="forbidden")
     from datetime import datetime
     from zoneinfo import ZoneInfo
     from app.reminders import dispatch_due_reminders
