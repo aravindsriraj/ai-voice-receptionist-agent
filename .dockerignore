@@ -1,0 +1,22 @@
+# Never bake secrets or local cruft into the image (Cloud Run injects secrets at runtime)
+.env
+.env.*
+service-account.json
+*.json.key
+.venv
+venv
+.git
+.gitignore
+__pycache__
+*.pyc
+.pytest_cache
+tests
+docs
+deploy
+.superpowers
+.agents
+.claude
+.mcp.json
+opencode.json
+skills-lock.json
+README.md
