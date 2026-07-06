@@ -104,8 +104,9 @@ def get_runtime():
 app.include_router(make_router(get_user_store, get_twilio, settings, str(_STATIC)))
 
 
-@app.get("/healthz")
-async def healthz():
+@app.get("/health")
+async def health():
+    # NB: /healthz is intercepted by Google Front End on Cloud Run, so use /health.
     return {"ok": True}
 
 
